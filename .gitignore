@@ -1,0 +1,36 @@
+# Ignorar diretórios de ambientes virtuais
+fraud_detection/
+
+
+# Ignorar arquivos do Jupyter
+.ipynb_checkpoints/
+
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar arquivos temporários de editores
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Ignorar arquivos de dados grandes
+*.csv
+*.xlsx
+*.json
+*.hdf5
+
+# Ignorar modelos de machine learning
+*.h5
+*.pkl
+*.joblib
+
+# Ignorar arquivos de log
+*.log
+
+# Ignorar arquivos de configurações do sistema
+*.bak
+*.tmp
+
+data/
