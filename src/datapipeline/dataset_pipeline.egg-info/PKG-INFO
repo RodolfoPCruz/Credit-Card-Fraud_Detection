@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: dataset-pipeline
+Version: 0.1.0
+Summary: Dataset loading, validation and hashing pipeline
+Requires-Python: >=3.11
+Requires-Dist: mlflow<4.0,>=3.8
+Requires-Dist: pandas<3.0,>=2.3
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pipreqs; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: jupyterlab; extra == "dev"

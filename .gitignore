@@ -1,5 +1,7 @@
 # Ignorar diretórios de ambientes virtuais
 fraud_detection/
+.venv/
+venv/
 
 
 # Ignorar arquivos do Jupyter
@@ -28,6 +30,7 @@ Thumbs.db
 
 # Ignorar arquivos de log
 *.log
+logs/
 
 # Ignorar arquivos de configurações do sistema
 *.bak

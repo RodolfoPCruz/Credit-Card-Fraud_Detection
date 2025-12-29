@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+# =========================
+# METADADOS DO PROJETO
+# =========================
+[project]
+name = "data-pipeline"
+version = "0.1.0"
+description = "Pipeline de dados e treinamento de modelos com MLflow"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Dependências de RUNTIME (apenas o que o código importa)
+dependencies = [
+  "mlflow>=3.8,<4.0",
+  "pandas>=2.3,<3.0",
+  "PyYAML>=6.0"
+]
+
+# =========================
+# DEPENDÊNCIAS OPCIONAIS
+# =========================
+[project.optional-dependencies]
+
+# Ferramentas de desenvolvimento
+dev = [
+  "pytest",
+  "pipreqs",
+  "black",
+  "ruff",
+  "jupyterlab",
+  "ipykernel"
+]
+
+# =========================
+# ENTRYPOINTS (CLI)
+# =========================
+[project.scripts]
+load-data = "datapipeline.data.load_data:main"
+validate-schema = "datapipeline.data.validate_schema:main"
+train-model = "datapipeline.models.train_model:train"
+
+# =========================
+# CONFIGURAÇÃO DO SETUPTOOLS
+# =========================
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# =========================
+# FERRAMENTAS (opcional, mas recomendado)
+# =========================
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+
+

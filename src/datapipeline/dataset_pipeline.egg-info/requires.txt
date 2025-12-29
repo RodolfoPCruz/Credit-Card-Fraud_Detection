@@ -1,0 +1,10 @@
+mlflow<4.0,>=3.8
+pandas<3.0,>=2.3
+PyYAML>=6.0
+
+[dev]
+pytest
+pipreqs
+black
+ruff
+jupyterlab

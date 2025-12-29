@@ -1,0 +1,4 @@
+[console_scripts]
+load-data = datapipeline.data.load_data:main
+train-model = datapipeline.models.train_model:train
+validate-schema = datapipeline.data.validate_schema:main
