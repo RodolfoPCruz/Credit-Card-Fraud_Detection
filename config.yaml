@@ -4,3 +4,10 @@ data_ingestion:
   experiment_name: 'Credit-Card-Fraud-Detection'
   run_name: Data Ingestion
   log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/'
+
+data_clean:
+  experiment_name: 'Credit-Card-Fraud-Detection'
+  run_name: Data Cleaning
+  log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/' 
+  target_column: 'Class'
+  
