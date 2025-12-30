@@ -1,13 +1,13 @@
+pipeline:
+  log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/pipeline_logs.log'
+  experiment_name: 'Credit-Card-Fraud-Detection'
+
+
 data_ingestion:
   dataset_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/creditcard.csv'
   schema_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/src/datapipeline/config/data_schema.yaml'
-  experiment_name: 'Credit-Card-Fraud-Detection'
-  run_name: Data Ingestion
-  log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/'
 
 data_clean:
-  experiment_name: 'Credit-Card-Fraud-Detection'
-  run_name: Data Cleaning
-  log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/' 
   target_column: 'Class'
   
+
