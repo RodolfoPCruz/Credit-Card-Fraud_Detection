@@ -6,15 +6,18 @@ import logging
 from enum import Enum
 from datapipeline.data.load_data import load_raw_data
 from datapipeline.data.clean_data import clean_data
+from datapipeline.data.split_data import split_data
 from datapipeline.config.logging_config import setup_logging
 
 class Stage(str, Enum):
     INGEST = 'ingest'
     CLEAN = 'clean'
+    SPLIT = 'split'
 
 PIPELINE_STAGES = [
     Stage.INGEST,
     Stage.CLEAN,
+    Stage.SPLIT
 ]
 
 def parse_args():
@@ -29,7 +32,6 @@ def parse_args():
         '--stage',
         type=Stage,
         help='Stage of the pipeline',
-        required=True,
         default=Stage.INGEST, 
         choices=list(Stage)
     )
@@ -62,7 +64,8 @@ def main():
                     schema = yaml.safe_load(f)
                 df, dataset_hash = load_raw_data(
                     dataset_path=config['data_ingestion']['dataset_path'],
-                    schema=schema
+                    schema=schema,
+                    logger=logger
                 )
 
                 mlflow.set_tag("schema_version", schema["schema_version"])
@@ -81,10 +84,39 @@ def main():
             with mlflow.start_run(run_name='data_cleaning', nested=True):
                 df, removed_rows = clean_data(
                     df=df,
-                    target_column=config['data_clean']['target_column']
+                    target_column=config['data']['target_column'],
+                    logger=logger
                 )
 
                 mlflow.log_metric("rows_removed", removed_rows)
+
+        #---------------Data Split--------------------------------
+        if Stage.SPLIT in PIPELINE_STAGES[start_idx:]:
+            with mlflow.start_run(run_name='data_split', nested=True):
+                test_size = config['data_split']['test_size']
+                random_state = config['data_split']['random_state']
+                target_column=config['data']['target_column']
+                
+                mlflow.log_metric("test_size", test_size)
+                mlflow.log_param("random_state", random_state)
+
+                train_df, test_df = split_data(
+                    df=df,
+                    target_column=target_column,
+                    test_size=test_size,
+                    random_state=random_state,
+                    logger=logger
+                )
+
+                train_path = config['data_split']['train_path']
+                test_path = config['data_split']['test_path']
+
+                train_df.to_parquet(train_path)
+                test_df.to_parquet(test_path)
+
+                mlflow.log_artifact(train_path, artifact_path="train")
+                mlflow.log_artifact(test_path, artifact_path="test")
+
 
 if __name__ == "__main__":
     main()

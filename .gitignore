@@ -38,3 +38,7 @@ logs/
 
 data/
 testes_jupyter/
+
+mlruns/
+
+
