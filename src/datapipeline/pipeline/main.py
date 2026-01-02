@@ -7,6 +7,8 @@ from enum import Enum
 from datapipeline.data.load_data import load_raw_data
 from datapipeline.data.clean_data import clean_data
 from datapipeline.data.split_data import split_data
+from datapipeline.data.validate_data import validate_data
+from datapipeline.data.validate_split import validate_split
 from datapipeline.config.logging_config import setup_logging
 
 class Stage(str, Enum):
@@ -88,6 +90,14 @@ def main():
                     logger=logger
                 )
 
+                validate_data(
+                    df=df,
+                    target_column=config['data']['target_column'],
+                    min_samples=config['data']['min_samples'],
+                    num_classes=config['data']['num_classes'],
+                    logger=logger
+                ) 
+
                 mlflow.log_metric("rows_removed", removed_rows)
 
         #---------------Data Split--------------------------------
@@ -105,6 +115,14 @@ def main():
                     target_column=target_column,
                     test_size=test_size,
                     random_state=random_state,
+                    logger=logger
+                )
+
+                validate_split(
+                    train_df=train_df,
+                    test_df=test_df,
+                    target_column=target_column,
+                    tolerance=config['data']['tolerance'],
                     logger=logger
                 )
 
