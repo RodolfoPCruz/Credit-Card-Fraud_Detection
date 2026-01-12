@@ -2,6 +2,8 @@ import argparse
 import yaml
 import mlflow
 import logging
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from enum import Enum
 from datapipeline.data.load_data import load_raw_data
@@ -9,18 +11,15 @@ from datapipeline.data.clean_data import clean_data
 from datapipeline.data.split_data import split_data
 from datapipeline.data.validate_data import validate_data
 from datapipeline.data.validate_split import validate_split
+from datapipeline.diagnostics.run_correlation_diagnostics import run_correlation_diagnostics
 from datapipeline.config.logging_config import setup_logging
 
 class Stage(str, Enum):
     INGEST = 'ingest'
     CLEAN = 'clean'
     SPLIT = 'split'
+    CORRELATION = 'correlation'
 
-PIPELINE_STAGES = [
-    Stage.INGEST,
-    Stage.CLEAN,
-    Stage.SPLIT
-]
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Credit Card Fraud Detection Pipeline')
@@ -37,11 +36,27 @@ def parse_args():
         default=Stage.INGEST, 
         choices=list(Stage)
     )
+    parser.add_argument(
+        '--run_correlation_diagnostics',
+        action='store_true',
+        help='whether to run correlation diagnostics')
+    
     args = parser.parse_args()
     return args
 
 def main():
+
     args = parse_args()
+    
+    PIPELINE_STAGES = [
+                Stage.INGEST,
+                Stage.CLEAN,
+                Stage.SPLIT,
+                      ]
+    if args.run_correlation_diagnostics:
+        PIPELINE_STAGES.append(Stage.CORRELATION)
+
+
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
@@ -134,6 +149,26 @@ def main():
 
                 mlflow.log_artifact(train_path, artifact_path="train")
                 mlflow.log_artifact(test_path, artifact_path="test")
+
+        #---------------Correlation-Diagnostics--------------------------------
+        if Stage.CORRELATION in PIPELINE_STAGES[start_idx:]:
+            with mlflow.start_run(run_name='correlation diagnostics', 
+                                  nested=True):
+                corr_matrix, corr_metadata = run_correlation_diagnostics(train_df, 
+                    logger=logger)
+                plt.figure(figsize=(12, 10))
+                sns.heatmap(corr_matrix)
+                path_corr_matrix = config['artifacts_path']['correlation_matrix']
+                path_corr_metadata = config['artifacts_path']['correlation_metadata']
+                path_corr_heatmap =  config['artifacts_path']['correlation_heatmap']
+
+                corr_matrix.to_parquet(path_corr_matrix)
+                corr_metadata.to_parquet(path_corr_metadata)
+                plt.savefig(path_corr_heatmap, dpi = 400,
+                            bbox_inches='tight')
+                mlflow.log_artifact(path_corr_matrix, artifact_path='correlation')
+                mlflow.log_artifact(path_corr_metadata, artifact_path='correlation')
+                mlflow.log_artifact(path_corr_heatmap, artifact_path='correlation')
 
 
 if __name__ == "__main__":
