@@ -7,6 +7,9 @@ venv/
 # Ignorar arquivos do Jupyter
 .ipynb_checkpoints/
 
+#Artifacts
+artifacts/
+
 # Ignorar arquivos do sistema
 .DS_Store
 Thumbs.db
@@ -22,6 +25,7 @@ Thumbs.db
 *.xlsx
 *.json
 *.hdf5
+*.parquet
 
 # Ignorar modelos de machine learning
 *.h5
@@ -36,9 +40,19 @@ logs/
 *.bak
 *.tmp
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+
 data/
 testes_jupyter/
 
+
+# MLflow
 mlruns/
+mlflow.db
 
 

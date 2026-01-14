@@ -4,6 +4,7 @@ import mlflow
 import logging
 import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from enum import Enum
 from datapipeline.data.load_data import load_raw_data
@@ -12,6 +13,8 @@ from datapipeline.data.split_data import split_data
 from datapipeline.data.validate_data import validate_data
 from datapipeline.data.validate_split import validate_split
 from datapipeline.diagnostics.run_correlation_diagnostics import run_correlation_diagnostics
+from datapipeline.features.correlation_pipeline import find_correlated_features
+from datapipeline.features.feature_engineering import apply_feature_engineering
 from datapipeline.config.logging_config import setup_logging
 
 class Stage(str, Enum):
@@ -19,6 +22,7 @@ class Stage(str, Enum):
     CLEAN = 'clean'
     SPLIT = 'split'
     CORRELATION = 'correlation'
+    FEATURE_ENGINEERING = 'feature_engineering'
 
 
 def parse_args():
@@ -52,9 +56,10 @@ def main():
                 Stage.INGEST,
                 Stage.CLEAN,
                 Stage.SPLIT,
+                Stage.FEATURE_ENGINEERING
                       ]
     if args.run_correlation_diagnostics:
-        PIPELINE_STAGES.append(Stage.CORRELATION)
+        PIPELINE_STAGES.insert(3,Stage.CORRELATION)
 
 
     with open(args.config, 'r') as f:
@@ -122,7 +127,7 @@ def main():
                 random_state = config['data_split']['random_state']
                 target_column=config['data']['target_column']
                 
-                mlflow.log_metric("test_size", test_size)
+                mlflow.log_param("test_size", test_size)
                 mlflow.log_param("random_state", random_state)
 
                 train_df, test_df = split_data(
@@ -158,18 +163,42 @@ def main():
                     logger=logger)
                 plt.figure(figsize=(12, 10))
                 sns.heatmap(corr_matrix)
-                path_corr_matrix = config['artifacts_path']['correlation_matrix']
-                path_corr_metadata = config['artifacts_path']['correlation_metadata']
-                path_corr_heatmap =  config['artifacts_path']['correlation_heatmap']
+                path_corr_matrix = config['diagnostics']['correlation_matrix']
+                path_corr_metadata = config['diagnostics']['correlation_metadata']
+                path_corr_heatmap =  config['diagnostics']['correlation_heatmap']
 
                 corr_matrix.to_parquet(path_corr_matrix)
                 corr_metadata.to_parquet(path_corr_metadata)
                 plt.savefig(path_corr_heatmap, dpi = 400,
                             bbox_inches='tight')
-                mlflow.log_artifact(path_corr_matrix, artifact_path='correlation')
-                mlflow.log_artifact(path_corr_metadata, artifact_path='correlation')
-                mlflow.log_artifact(path_corr_heatmap, artifact_path='correlation')
+                mlflow.log_artifact(path_corr_matrix, artifact_path='correlation_diagnostics')
+                mlflow.log_artifact(path_corr_metadata, artifact_path='correlation_diagnostics')
+                mlflow.log_artifact(path_corr_heatmap, artifact_path='correlation_diagnostics')
 
+        #---------------Correlation-Diagnostics--------------------------------
+        if Stage.FEATURE_ENGINEERING in PIPELINE_STAGES[start_idx:]:
+            with mlflow.start_run(run_name='feature engineering', 
+                                  nested=True):
+                target_column = config['data']['target_column']
+                remove_correlated_features = bool(config['feature_engineering']['remove_correlated_features'])
+                threshold = config['feature_engineering']['threshold']
+                logger.info(f'Removing correlated features: {remove_correlated_features}')
+
+                if remove_correlated_features:
+                    logger.info(f'Threshold: {threshold}')
+                    mlflow.log_param("correlation_threshold", threshold)
+                    mlflow.log_param("remove correlated features", remove_correlated_features)
+                    features_to_remove = find_correlated_features(train_df, threshold)
+                    features_to_remove_path = config['feature_engineering']['correlated_features']
+                    pd.Series(features_to_remove, name = 'feature').to_parquet(features_to_remove_path)
+                    mlflow.log_artifact(features_to_remove_path, artifact_path='feature_engineering')
+                    train_df_fe , test_df_fe = apply_feature_engineering(train_df, 
+                                                                         test_df, 
+                                                                         target_column, 
+                                                                         remove_correlated_features, 
+                                                                         threshold, 
+                                                                         logger=logger)
+                
 
 if __name__ == "__main__":
     main()
