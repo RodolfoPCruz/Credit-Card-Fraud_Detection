@@ -8,6 +8,7 @@ def apply_feature_engineering(
     target_column: str,
     remove_correlated: bool,
     correlation_threshold: float,
+    correlated_features: pd.DataFrame = None,
     logger: logging.Logger | None = None
     ):
     """
@@ -23,6 +24,7 @@ def apply_feature_engineering(
         remove_correlated (bool): whther to remove correlated features
         correlation_threshold (float): threshold above which one of 
             the features will be removed
+        correlated_features (list): list of correlated features
         logger (logging.Logger | None, optional): logger object
 
     Returns:
@@ -34,7 +36,8 @@ def apply_feature_engineering(
     X_test = test_df.drop(columns = target_column)
 
     if remove_correlated:
-        correlated_features = find_correlated_features(X_train, correlation_threshold)
+        if correlated_features is None:
+            correlated_features = find_correlated_features(X_train, correlation_threshold)
         X_train = X_train.drop(columns = correlated_features)
         X_test = X_test.drop(columns = correlated_features)
 
@@ -43,5 +46,5 @@ def apply_feature_engineering(
 
     train_df_fe = pd.concat([X_train, train_df[target_column]], axis=1)
     test_df_fe = pd.concat([X_test, test_df[target_column]], axis=1)
-
+    
     return train_df_fe, test_df_fe

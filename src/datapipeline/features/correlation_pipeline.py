@@ -38,5 +38,4 @@ def find_correlated_features(
     to_drop = [feature for feature in upper_triangle if
                np.any(upper_triangle[feature]>threshold)]
 
-
     return to_drop

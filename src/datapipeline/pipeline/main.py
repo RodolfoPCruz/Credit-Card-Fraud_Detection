@@ -175,11 +175,13 @@ def main():
                 mlflow.log_artifact(path_corr_metadata, artifact_path='correlation_diagnostics')
                 mlflow.log_artifact(path_corr_heatmap, artifact_path='correlation_diagnostics')
 
-        #---------------Correlation-Diagnostics--------------------------------
+        #---------------Feature Engineeruing--------------------------------
         if Stage.FEATURE_ENGINEERING in PIPELINE_STAGES[start_idx:]:
             with mlflow.start_run(run_name='feature engineering', 
                                   nested=True):
                 target_column = config['data']['target_column']
+                train_path_fe = config['feature_engineering']['train_path_feature_engineered']
+                test_path_fe = config['feature_engineering']['test_path_feature_engineered']
                 remove_correlated_features = bool(config['feature_engineering']['remove_correlated_features'])
                 threshold = config['feature_engineering']['threshold']
                 logger.info(f'Removing correlated features: {remove_correlated_features}')
@@ -189,15 +191,21 @@ def main():
                     mlflow.log_param("correlation_threshold", threshold)
                     mlflow.log_param("remove correlated features", remove_correlated_features)
                     features_to_remove = find_correlated_features(train_df, threshold)
-                    features_to_remove_path = config['feature_engineering']['correlated_features']
-                    pd.Series(features_to_remove, name = 'feature').to_parquet(features_to_remove_path)
-                    mlflow.log_artifact(features_to_remove_path, artifact_path='feature_engineering')
+                    if features_to_remove:
+                        features_to_remove_path = config['feature_engineering']['correlated_features']
+                        pd.DataFrame(features_to_remove, columns = 'feature').to_parquet(features_to_remove_path)
+                        mlflow.log_artifact(features_to_remove_path, artifact_path='feature_engineering')
                     train_df_fe , test_df_fe = apply_feature_engineering(train_df, 
                                                                          test_df, 
                                                                          target_column, 
                                                                          remove_correlated_features, 
-                                                                         threshold, 
+                                                                         threshold,
+                                                                         features_to_remove, 
                                                                          logger=logger)
+                    train_df_fe.to_parquet(train_path_fe)
+                    test_df_fe.to_parquet(test_path_fe)
+                    mlflow.log_artifact(train_path_fe, artifact_path='feature_engineering')
+                    mlflow.log_artifact(test_path_fe, artifact_path='feature_engineering')
                 
 
 if __name__ == "__main__":

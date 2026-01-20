@@ -28,3 +28,11 @@ feature_engineering:
   remove_correlated_features: 1
   threshold: 0.95
   correlated_features : '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/feature_engineering/correlation/correlated_features.parquet'
+  train_path_feature_engineered: '../data/splits/feature_engineered/train_fe.parquet'
+  test_path_feature_engineered: '../data/splits/feature_engineered/test_fe.parquet'
+  
+model_selection:
+  artifacts_path: '../artifacts/model_selection'
+
+model_training:
+  random_state: 42
