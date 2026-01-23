@@ -54,5 +54,8 @@ testes_jupyter/
 # MLflow
 mlruns/
 mlflow.db
+mlflow/
+
+*.sh
 
 

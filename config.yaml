@@ -34,5 +34,8 @@ feature_engineering:
 model_selection:
   artifacts_path: '../artifacts/model_selection'
 
+model_tuning:
+  artifacts_path: '../artifacts/model_tuning'
+
 model_training:
   random_state: 42
