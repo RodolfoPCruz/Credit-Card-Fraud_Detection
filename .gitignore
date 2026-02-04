@@ -58,4 +58,4 @@ mlflow/
 
 *.sh
 
-
+notebooks/catboost_info/
