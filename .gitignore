@@ -62,3 +62,6 @@ notebooks/catboost_info/
 
 *.pyc
 *.tsv
+
+# Python packaging
+*.egg-info/
