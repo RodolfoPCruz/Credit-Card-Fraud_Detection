@@ -12,10 +12,12 @@ from datapipeline.data.clean_data import clean_data
 from datapipeline.data.split_data import split_data
 from datapipeline.data.validate_data import validate_data
 from datapipeline.data.validate_split import validate_split
+from datapipeline.data.model_training import train_model
 from datapipeline.diagnostics.run_correlation_diagnostics import run_correlation_diagnostics
 from datapipeline.features.correlation_pipeline import find_correlated_features
 from datapipeline.features.feature_engineering import apply_feature_engineering
 from datapipeline.config.logging_config import setup_logging
+from datapipeline.config.mlflow_config import setup_mlflow
 
 class Stage(str, Enum):
     INGEST = 'ingest'
@@ -23,6 +25,7 @@ class Stage(str, Enum):
     SPLIT = 'split'
     CORRELATION = 'correlation'
     FEATURE_ENGINEERING = 'feature_engineering'
+    MODEL_TRAINING = 'model_training'
 
 
 def parse_args():
@@ -56,7 +59,8 @@ def main():
                 Stage.INGEST,
                 Stage.CLEAN,
                 Stage.SPLIT,
-                Stage.FEATURE_ENGINEERING
+                Stage.FEATURE_ENGINEERING,
+                Stage.MODEL_TRAINING
                       ]
     if args.run_correlation_diagnostics:
         PIPELINE_STAGES.insert(3,Stage.CORRELATION)
@@ -71,7 +75,9 @@ def main():
     logger = logging.getLogger('pipeline')
 
     #MLFlow
-    mlflow.set_experiment(config['pipeline']['experiment_name'])
+    mlflow_experiment_name = config['pipeline']['experiment_name']
+    mlflow.set_experiment(mlflow_experiment_name)
+    setup_mlflow(mlflow_experiment_name)
 
     with mlflow.start_run(run_name='pipeline_execution'):
 
@@ -187,7 +193,7 @@ def main():
                 logger.info(f'Removing correlated features: {remove_correlated_features}')
 
                 if remove_correlated_features:
-                    logger.info(f'Threshold: {threshold}')
+                    logger.info(f'Correlation Threshold: {threshold}')
                     mlflow.log_param("correlation_threshold", threshold)
                     mlflow.log_param("remove correlated features", remove_correlated_features)
                     features_to_remove = find_correlated_features(train_df, threshold)
@@ -206,7 +212,43 @@ def main():
                     test_df_fe.to_parquet(test_path_fe)
                     mlflow.log_artifact(train_path_fe, artifact_path='feature_engineering')
                     mlflow.log_artifact(test_path_fe, artifact_path='feature_engineering')
-                
+
+        #---------------Model Training----------------------------
+        if Stage.MODEL_TRAINING in PIPELINE_STAGES[start_idx:]:
+            with mlflow.start_run(run_name='Model_training', 
+                                  nested=True):
+                target_column = config['data']['target_column']
+                train_path_fe = config['feature_engineering']['train_path_feature_engineered']
+                test_path_fe = config['feature_engineering']['test_path_feature_engineered']
+                train_df_fe = pd.read_parquet(train_path_fe)
+                test_df_fe = pd.read_parquet(test_path_fe)
+
+                model_name = config['model_training']['model_name']
+
+                hyperparameters = {}
+                hyperparameters['random_state'] = config['model_training']['random_state']
+                hyperparameters['l2_leaf_reg'] = config['model_training']['l2_leaf_reg']
+                hyperparameters['depth'] = config['model_training']['depth']
+                hyperparameters['iterations'] = config['model_training']['iterations']
+                hyperparameters['learning_rate'] = config['model_training']['learning_rate']
+
+                classification_threshold = float(config['model_training']['threshold'])
+
+
+                results = train_model(
+                    train_df = train_df_fe,
+                    test_df= test_df_fe,
+                    target_column = target_column,
+                    hyperparameters = hyperparameters,
+                    threshold = classification_threshold,
+                    logger = logger)
+
+                mlflow.log_param('classification_thresold', results['Threshold'])
+                mlflow.log_param('model_name', model_name)
+
+                mlflow.log_metric('AUC', results['AUC'])
+                mlflow.log_metric('Recall', results['Recall'])
+                mlflow.log_metric('Precision', results['Precision'])
 
 if __name__ == "__main__":
     main()

@@ -59,3 +59,6 @@ mlflow/
 *.sh
 
 notebooks/catboost_info/
+
+*.pyc
+*.tsv
