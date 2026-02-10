@@ -1,44 +1,48 @@
 pipeline:
-  log_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/logs/pipeline_logs.log'
+  log_path: logs/pipeline_logs.log'
   experiment_name: 'Credit-Card-Fraud-Detection'
 
 
 data_ingestion:
-  dataset_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/raw/creditcard.csv'
-  schema_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/src/datapipeline/config/data_schema.yaml'
+  schema_path : 'src/datapipeline/config/data_schema.yaml'
+  dataset_path: 'data/raw/creditcard.csv'
 
-data:
+data_cleaning:
   target_column: 'Class'
   min_samples: 1000
   num_classes: 2
-  tolerance: 0.01
   
 data_split:
   test_size: 0.3
   random_state: 42
-  train_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/splits/train.parquet'
-  test_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/splits/test.parquet'
+  train_path: 'data/splits/train.parquet'
+  test_path: 'data/splits/test.parquet'
+  tolerance: 0.01
+  train_artifact_path_mlflow: 'train' 
+  test_artifact_path_mlflow: 'test'
   
 diagnostics:
-  correlation_matrix: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/eda/correlation/correlation_matrix.parquet'
-  correlation_metadata: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/eda/correlation/correlation_matedata.parquet'
-  correlation_heatmap: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/eda/correlation/correlation_heatmap.png'
+  correlation_matrix: 'artifacts/eda/correlation/correlation_matrix.parquet'
+  correlation_metadata: 'artifacts/eda/correlation/correlation_matedata.parquet'
+  correlation_heatmap: 'artifacts/eda/correlation/correlation_heatmap.png'
+  correlation_path_mlflow: 'correlation_diagnostics'
 
 feature_engineering:
   remove_correlated_features: 1
   threshold: 0.95
-  correlated_features : '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/feature_engineering/correlation/correlated_features.parquet'
-  train_path_feature_engineered: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/splits//feature_engineered/train_fe.parquet'
-  test_path_feature_engineered: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/data/splits//feature_engineered/test_fe.parquet'
+  correlated_features : 'artifacts/feature_engineering/correlation/correlated_features.parquet'
+  train_path_feature_engineered: 'data/splits//feature_engineered/train_fe.parquet'
+  test_path_feature_engineered: 'data/splits//feature_engineered/test_fe.parquet'
+  fe_path_mlflow: 'feature_engineering'
   
 model_selection:
-  artifacts_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts//model_selection'
+  artifacts_path: 'artifacts//model_selection'
 
 model_tuning:
-  artifacts_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/model_tuning'
+  artifacts_path: 'artifacts/model_tuning'
 
 threshold_tuning:
-  artifacts_path: '/home/rodolfo/Insync/rodolfopcruz2@gmail.com/Google Drive/Estudo/Projetos-Novos/Credit_card_fraud_detection/artifacts/threshold_tuning'
+  artifacts_path: 'artifacts/threshold_tuning'
 
 model_training:
   random_state: 42
@@ -48,3 +52,9 @@ model_training:
   iterations: 789
   learning_rate: 0.02
   threshold: 0.28
+  threshold_file_name: "threshold.json"
+  artifacts_path_mlflow: "model_config"
+  registered_model_name: "fraud_catboost"
+  artifacts_path: 'artifacts/model_training'
+
+inference: 

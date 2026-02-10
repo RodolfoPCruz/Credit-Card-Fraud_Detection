@@ -59,9 +59,12 @@ mlflow/
 *.sh
 
 notebooks/catboost_info/
+catboost_info/
 
 *.pyc
 *.tsv
 
 # Python packaging
 *.egg-info/
+
+anotacoes/

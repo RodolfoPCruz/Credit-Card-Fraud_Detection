@@ -2,6 +2,7 @@ from datapipeline.diagnostics.feature_correlation import FeatureCorrelation
 import logging
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 def run_correlation_diagnostics(df: pd.DataFrame,
                logger: logging.Logger | None = None
@@ -14,6 +15,7 @@ def run_correlation_diagnostics(df: pd.DataFrame,
     Args:
         df (pd.DataFrame): pandas dataframe containing the features to be 
             analysed.
+        path_savefig (str): path to save plot of correlation matrix. 
         logger (logging.Logger | None, optional): The logger to use. 
             Defaults to None.
 
@@ -30,6 +32,7 @@ def run_correlation_diagnostics(df: pd.DataFrame,
 
     correlation_matrix = corr.correlation_matrix()
     correlation_metadata = corr.correlation_metadata_table()
-
+	
+	
     return (correlation_matrix, 
             correlation_metadata)
