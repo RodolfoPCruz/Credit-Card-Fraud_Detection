@@ -19,7 +19,8 @@ from datapipeline.features.feature_engineering import apply_feature_engineering
 from datapipeline.config.logging_config import setup_logging
 from datapipeline.config.mlflow_config import setup_mlflow
 from datapipeline.config.mlflow_config import get_project_root
-
+from datapipeline.inference.load_model_and_threshold import load_latest_model_and_threshold
+from datapipeline.inference.predict import predict
 
 class Stage(str, Enum):
     INGEST = 'ingest'
@@ -28,7 +29,7 @@ class Stage(str, Enum):
     CORRELATION = 'correlation'
     FEATURE_ENGINEERING = 'feature_engineering'
     MODEL_TRAINING = 'model_training'
-
+    INFERENCE = 'inference' 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Credit Card Fraud Detection Pipeline')
@@ -62,7 +63,8 @@ def main():
                 Stage.CLEAN,
                 Stage.SPLIT,
                 Stage.FEATURE_ENGINEERING,
-                Stage.MODEL_TRAINING
+                Stage.MODEL_TRAINING,
+                Stage.INFERENCE
                       ]
     if args.run_correlation_diagnostics:
         PIPELINE_STAGES.insert(3,Stage.CORRELATION)
@@ -250,7 +252,6 @@ def main():
                 registered_model_name = config['model_training']['registered_model_name']
                 artifacts_path_mlflow = config['model_training']['artifacts_path_mlflow']
 
-
                 results = train_model(
                     train_df = train_df_fe,
                     test_df= test_df_fe,
@@ -269,6 +270,36 @@ def main():
                 mlflow.log_metric('AUC', results['AUC'])
                 mlflow.log_metric('Recall', results['Recall'])
                 mlflow.log_metric('Precision', results['Precision'])
+
+        #---------------Inference----------------------------
+        if Stage.INFERENCE in PIPELINE_STAGES[start_idx:]:
+             with mlflow.start_run(run_name='Inference', 
+                                  nested=True):
+                
+                artifacts_path_mlflow = config['model_training']['artifacts_path_mlflow']
+                registered_model_name = config['model_training']['registered_model_name']
+
+                model, threshold = load_latest_model_and_threshold(
+                    registered_model_name = registered_model_name,
+                    artifact_path_mlflow = artifacts_path_mlflow,
+                    file_name_threshold = config['model_training']['threshold_file_name']
+                )
+                test_path_fe = PROJECT_ROOT / config['feature_engineering']['test_path_feature_engineered']
+                test_df_fe = pd.read_parquet(test_path_fe)
+                target_column = config['data_cleaning']['target_column']
+
+                predictions_path = config['inference']['artifacts_path']
+                artifacts_path_mlflow = config['inference']['artifacts_path_mlflow']
+
+                predictions = predict(model = model,
+                                    data = test_df_fe,
+                                    threshold = threshold,
+                                    target_column = target_column)
+
+                predictions.to_parquet(predictions_path)
+                mlflow.log_artifact(predictions_path, artifact_path=artifacts_path_mlflow)
+
+
 
 if __name__ == "__main__":
     main()

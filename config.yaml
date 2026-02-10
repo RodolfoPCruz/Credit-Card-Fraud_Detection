@@ -58,3 +58,5 @@ model_training:
   artifacts_path: 'artifacts/model_training'
 
 inference: 
+  artifacts_path: 'artifacts/inference/predictions.parquet'
+  artifacts_path_mlflow: 'inference'
