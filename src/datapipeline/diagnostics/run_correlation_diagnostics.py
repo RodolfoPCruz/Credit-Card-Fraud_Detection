@@ -5,6 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 def run_correlation_diagnostics(df: pd.DataFrame,
+               path_savefig: str,     
                logger: logging.Logger | None = None
                ):
     """
@@ -33,6 +34,11 @@ def run_correlation_diagnostics(df: pd.DataFrame,
     correlation_matrix = corr.correlation_matrix()
     correlation_metadata = corr.correlation_metadata_table()
 	
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(correlation_matrix)
+    plt.savefig(path_savefig, dpi = 400,
+                            bbox_inches='tight')
+
 	
     return (correlation_matrix, 
             correlation_metadata)
