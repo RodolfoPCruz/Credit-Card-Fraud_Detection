@@ -57,7 +57,416 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+class PipelineRunner():
+
+    def __init__(self, config_path: str, stage: Stage, run_correlation_diagnostics: bool):
+
+        self.config_path = config_path
+        self.stage = stage
+        self.run_correlation_diagnostics = run_correlation_diagnostics  
+
+        #Initial state of the pipeline
+        self.df = None
+        self.df_cleaned = None
+        self.train_df = None
+        self.test_df = None
+        self.train_df_fe = None
+        self.test_df_fe = None
+
+        #The following will be initialized after
+        self.config = None
+        self.logger = None
+        self.project_root = None
+        self.schema = None
+        self.dataset_hah = None
+        self.git_commit = None
+
+    def _load_config(self):
+        with open(self.config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+
+    def _bootstrap(self):
+
+        self._load_config()
+
+        self.project_root = get_project_root()
+
+        #logging
+        log_path = self.project_root / self.config['pipeline']['log_path']
+        setup_logging(log_path)
+        self.logger = logging.getLogger("pipeline")
+
+        #schema
+        self.schema_path = self.project_root / self.config['data_ingestion']["schema_path"]
+        with open(self.schema_path, "r") as f:
+            self.schema = yaml.safe_load(f)
+
+        #Dataset hash
+        self.dataset_hash = compute_hash(
+            self.project_root / self.config['data_ingestion']['raw_dataset_path'])
+
+        #Git commit
+        self.git_commit = get_git_commit()
+
+        #MlFlow
+        setup_mlflow(self.config['pipeline']['experiment_name'])
+
+    def run(self):
+
+        self._bootstrap()
+
+        PIPELINE_STAGES = [
+                Stage.INGEST,
+                Stage.CLEAN,
+                Stage.SPLIT,
+                Stage.FEATURE_ENGINEERING,
+                Stage.MODEL_TRAINING,
+                Stage.INFERENCE
+                      ]
+        if (self.run_correlation_diagnostics or
+            self.stage == Stage.CORRELATION):
+            PIPELINE_STAGES.insert(3,Stage.CORRELATION)
+
+        run_name = self.config['pipeline']['run_name']
+
+        start_idx = PIPELINE_STAGES.index(self.stage)
+        self.logger.info(f'Starting pipeline from stage: {self.stage}')
+
+
+        with mlflow.start_run(run_name=run_name):
+
+            self._set_global_tags()
+
+            #---------------Data Ingestion----------------------------------------
+            if Stage.INGEST in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(
+                    run_name=self.config['data_ingestion']['run_name'], 
+                                    nested=True):
+                    self.df, dataset_hash = load_raw_data(
+                    dataset_path= self.project_root / self.config['data_ingestion']['raw_dataset_path'],
+                    schema=self.schema,
+                    logger=self.logger
+                    )
+                    self.df.to_parquet(self.project_root / self.config['data_ingestion']['raw_dataset_path_parquet'])
+                    mlflow.log_param("raw_dataset_path", self.config['data_ingestion']['raw_dataset_path'])
+
+                    mlflow.log_metric("n_rows", self.df.shape[0])
+                    mlflow.log_metric("n_columns", self.df.shape[1])
+
+                mlflow.log_param("dataset_hash", dataset_hash)
+                mlflow.log_artifact(self.schema_path, artifact_path="schema")
+                mlflow.log_artifact(
+                    self.project_root / self.config['data_ingestion']['raw_dataset_path_parquet'], 
+                    artifact_path=self.config['data_ingestion']['raw_dataset_path_mlflow'])
+
+             #---------------Data Cleaning-----------------------------------------
+            if Stage.CLEAN in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(
+                    run_name=self.config['data_cleaning']['run_name'], nested=True):
+
+                    if self.df is None:
+                        self.df = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name=run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['data_ingestion']['raw_dataset_path_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+                
+                    self.df_cleaned, removed_rows = clean_data(
+                        df=self.df,
+                        target_column=self.config['data_cleaning']['target_column'],
+                        logger=self.logger
+                        )
+
+                    self.df_cleaned.to_parquet(
+                        self.project_root / self.config['data_cleaning']['cleaned_dataset_path'])
+
+                    validate_data(
+                        df=self.df_cleaned,
+                        target_column=self.config['data_cleaning']['target_column'],
+                        min_samples=self.config['data_cleaning']['min_samples'],
+                        num_classes=self.config['data_cleaning']['num_classes'],
+                        logger=self.logger
+                        ) 
+
+                    mlflow.log_metric("rows_removed", removed_rows)
+                mlflow.log_artifact(
+                    self.project_root / self.config['data_cleaning']['cleaned_dataset_path'], 
+                    artifact_path=self.config['data_cleaning']['cleaned_dataset_path_mlflow'])
+            
+            #---------------Data Split--------------------------------------------
+            if Stage.SPLIT in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(
+                    run_name=self.config['data_split']['run_name'],
+                                 nested=True):
+                    test_size = self.config['data_split']['test_size']
+                    random_state = self.config['data_split']['random_state']
+                    target_column=  self.config['data_cleaning']['target_column']
+                
+                    mlflow.log_param("test_size", test_size)
+                    mlflow.log_param("random_state", random_state)
+
+                    if self.df_cleaned is None:
+                        self.df_cleaned = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['data_cleaning']['cleaned_dataset_path_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+
+
+                    self.train_df, self.test_df = split_data(
+                        df=self.df_cleaned,
+                        target_column=target_column,
+                        test_size=test_size,
+                        random_state=random_state,
+                        logger=self.logger
+                    )
+
+                    validate_split(
+                        train_df=self.train_df,
+                        test_df=self.test_df,
+                        target_column=target_column,
+                        tolerance=self.config['data_split']['tolerance'],
+                        logger=self.logger
+                    )
+
+                    train_path = self.project_root / self.config['data_split']['train_path']
+                    test_path = self.project_root / self.config['data_split']['test_path']
+                    train_artifact_path_mlflow=self.config['data_split']['train_artifact_path_mlflow']
+                    test_artifact_path_mlflow=self.config['data_split']['test_artifact_path_mlflow']
+
+                    self.train_df.to_parquet(train_path)
+                    self.test_df.to_parquet(test_path)
+
+                mlflow.log_artifact(train_path, artifact_path=train_artifact_path_mlflow)
+                mlflow.log_artifact(test_path, artifact_path=test_artifact_path_mlflow)
+
+            #---------------Correlation-Diagnostics-------------------------------
+            if Stage.CORRELATION in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(run_name=self.config['diagnostics']['run_name'], 
+                                  nested=True):
+                    path_corr_matrix = self.project_root / self.config['diagnostics']['correlation_matrix']
+                    path_corr_metadata = self.project_root / self.config['diagnostics']['correlation_metadata']
+                    path_corr_heatmap =  self.project_root / self.config['diagnostics']['correlation_heatmap']
+                    correlation_path_mlflow = self.config['diagnostics']['correlation_path_mlflow']
+
+                    if self.train_df is None:
+                        self.train_df = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['data_split']['train_artifact_path_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+                
+                    corr_matrix, corr_metadata = run_correlation_diagnostics(self.train_df,
+                        path_corr_heatmap,
+                        logger=self.logger)
+
+                    corr_matrix.to_parquet(path_corr_matrix)
+                    corr_metadata.to_parquet(path_corr_metadata)
+                
+                mlflow.log_artifact(path_corr_matrix, artifact_path=correlation_path_mlflow)
+                mlflow.log_artifact(path_corr_metadata, artifact_path=correlation_path_mlflow)
+                mlflow.log_artifact(path_corr_heatmap, artifact_path=correlation_path_mlflow)
+            
+            #---------------Feature Engineeruing----------------------------------
+            if Stage.FEATURE_ENGINEERING in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(run_name=self.config['diagnostics']['run_name'], 
+                                  nested=True):
+                    target_column = self.config['data_cleaning']['target_column']
+                    train_path_feature_engineered_mlflow = self.config['feature_engineering']['train_path_feature_engineered_mlflow']
+                    test_path_feature_engineered_mlflow = self.config['feature_engineering']['test_path_feature_engineered_mlflow']
+                    train_path_fe = self.project_root / self.config['feature_engineering']['train_path_feature_engineered']
+                    test_path_fe =  self.project_root / self.config['feature_engineering']['test_path_feature_engineered']
+                    remove_correlated_features = bool(self.config['feature_engineering']['remove_correlated_features'])
+                    threshold_correlation = self.config['feature_engineering']['threshold_correlation']
+                    self.logger.info(f'Removing correlated features: {remove_correlated_features}')
+
+                    if self.train_df is None: 
+                        self.train_df = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['data_split']['train_artifact_path_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+
+                    if self.test_df is None: 
+                        self.test_df = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['data_split']['test_artifact_path_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+                
+                
+                    self.logger.info(f'Correlation Threshold: {threshold_correlation}')
+                    mlflow.log_param("correlation_threshold", threshold_correlation)
+                    mlflow.log_param("remove correlated features", remove_correlated_features)
+                    features_to_remove = find_correlated_features(self.train_df, threshold_correlation)
+                    if features_to_remove:
+                        features_to_remove_path =  self.project_root / self.config['feature_engineering']['correlated_features_path']
+                        pd.DataFrame(features_to_remove, columns = 'feature').to_parquet(features_to_remove_path)
+                        mlflow.log_artifact(features_to_remove_path, 
+                                            artifact_path=self.config['feature_engineering']['correlated_features_path_mlflow'])
+                
+                    self.train_df_fe , self.test_df_fe = apply_feature_engineering(self.train_df, 
+                                                                        self.test_df, 
+                                                                        target_column, 
+                                                                        remove_correlated_features, 
+                                                                        threshold_correlation,
+                                                                        features_to_remove, 
+                                                                        logger=self.logger)
+                    self.train_df_fe.to_parquet(train_path_fe)
+                    self.test_df_fe.to_parquet(test_path_fe)
+                mlflow.log_artifact(train_path_fe, artifact_path=train_path_feature_engineered_mlflow)
+                mlflow.log_artifact(test_path_fe, artifact_path=test_path_feature_engineered_mlflow)
+
+            #---------------Model Training----------------------------------------
+            if Stage.MODEL_TRAINING in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(run_name=self.config['model_training']['run_name'], 
+                                  nested=True):
+                    target_column = self.config['data_cleaning']['target_column']
+                    train_path_fe = self.project_root / self.config['feature_engineering']['train_path_feature_engineered']
+                    test_path_fe = self.project_root / self.config['feature_engineering']['test_path_feature_engineered']
+
+                    if self.train_df_fe is None:
+                        self.train_df_fe = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['feature_engineering']['train_path_feature_engineered_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+
+                    if self.test_df_fe is None:
+                        self.test_df_fe = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['feature_engineering']['test_path_feature_engineered_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+
+               
+                    classification_threshold_file_name = self.config['model_training']['classification_threshold_file_name']
+                    model_name = self.config['model_training']['model_name']
+
+                    hyperparameters = {}
+                    hyperparameters['random_state'] = self.config['model_training']['random_state']
+                    hyperparameters['l2_leaf_reg'] = self.config['model_training']['l2_leaf_reg']
+                    hyperparameters['depth'] = self.config['model_training']['depth']
+                    hyperparameters['iterations'] = self.config['model_training']['iterations']
+                    hyperparameters['learning_rate'] = self.config['model_training']['learning_rate']
+
+                    classification_threshold = float(self.config['model_training']['threshold'])
+                    artifact_path_model_training = self.config['model_training']['artifacts_path_model_training']
+                    registered_model_name = self.config['model_training']['registered_model_name']
+                    artifacts_path_mlflow_model_training = self.config['model_training']['artifacts_path_mlflow_model_training']
+
+                    results = train_model(
+                        train_df = self.train_df_fe,
+                        test_df= self.test_df_fe,
+                        target_column = target_column,
+                        hyperparameters = hyperparameters,
+                        threshold = classification_threshold,
+                        registered_model_name = registered_model_name,
+                        artifacts_dir=artifact_path_model_training,
+                        artifacts_path_mlflow = artifacts_path_mlflow_model_training,
+                        threshold_file_name = classification_threshold_file_name,
+                        logger = self.logger)
+
+                    mlflow.log_param('classification_threshold', results['Threshold'])
+                    mlflow.log_param('model_name', model_name)
+
+                    mlflow.log_metric('AUC', results['AUC'])
+                    mlflow.log_metric('Recall', results['Recall'])
+                    mlflow.log_metric('Precision', results['Precision'])
+                
+                    mlflow.log_param('classification_threshold', results['Threshold'])
+                    mlflow.log_param('model_name', model_name)
+            #---------------Inference---------------------------------------------
+            if Stage.INFERENCE in PIPELINE_STAGES[start_idx:]:
+                with mlflow.start_run(run_name=self.config['inference']['run_name'], 
+                                  nested=True):
+                
+                    artifacts_path_mlflow_model = self.config['model_training']['artifacts_path_mlflow_model_training']
+                    registered_model_name = self.config['model_training']['registered_model_name']
+
+                    model, threshold = load_latest_model_and_threshold(
+                        registered_model_name = registered_model_name,
+                        artifact_path_mlflow = artifacts_path_mlflow_model,
+                        file_name_threshold = self.config['model_training']['classification_threshold_file_name']
+                    )
+
+                    if self.test_df_fe is None:
+                        selftest_df_fe = load_df_from_mlflow(
+                            experiment_name = self.config['pipeline']['experiment_name'],
+                            run_name = run_name,
+                            pipeline_version = self.dataset_hash,
+                            artifact_path = self.config['feature_engineering']['test_path_feature_engineered_mlflow'],
+                            pipeline_status = self.config['pipeline']['pipeline_status'],
+                            logger=self.logger)
+               
+                    target_column = self.config['data_cleaning']['target_column']
+                    predictions_path = self.config['inference']['artifacts_path_inference']
+                    artifacts_path_predicitions_mlflow = self.config['inference']['artifacts_path_inference_mlflow']
+                    self.logger.info('Generating Predictions')
+                    predictions = predict(model = model,
+                                        data = self.test_df_fe,
+                                        threshold = threshold,
+                                        target_column = target_column)
+
+                    predictions.to_parquet(predictions_path)
+                mlflow.log_artifact(predictions_path, artifact_path=artifacts_path_predicitions_mlflow)
+                           
+            try:
+            # complete pipeline
+                mlflow.set_tag("pipeline_status", "completed")
+                mlflow.set_tag("initial_stage", self.stage)
+            except Exception:
+                mlflow.set_tag("pipeline_status", "failed")
+                raise
+
+    def _set_global_tags(self):
+        mlflow.set_tag("version", self.config['pipeline']['version'])
+        mlflow.set_tag('schema_version', self.schema["schema_version"])
+        mlflow.set_tag('dataset_name', self.schema["dataset_name"])
+        mlflow.set_tag('git_commit', self.git_commit)
+        mlflow.set_tag('dataset_hash', self.dataset_hash)
+
+
 def main():
+
+    args = parse_args()
+
+    runner = PipelineRunner(
+        config_path=args.config,
+        stage=args.stage,
+        run_correlation_diagnostics=args.run_correlation_diagnostics
+    )
+
+    runner.run()
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+def main_2():
+
 
     args = parse_args()
 

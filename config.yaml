@@ -2,7 +2,7 @@ pipeline:
   log_path: logs/pipeline_logs.log'
   experiment_name: 'Credit-Card-Fraud-Detection'
   run_name: 'pipeline'
-  run_tag: '1.0.0'
+  version: '1.0.0'
   pipeline_status: 'completed'
 
 data_ingestion:
