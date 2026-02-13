@@ -81,6 +81,8 @@ class PipelineRunner():
         self.dataset_hah = None
         self.git_commit = None
 
+        self.execution_type = None
+
     def _load_config(self):
         with open(self.config_path, 'r') as f:
             self.config = yaml.safe_load(f)

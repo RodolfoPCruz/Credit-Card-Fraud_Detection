@@ -16,7 +16,8 @@ def get_latest_pipeline_run_id(
     experiment_name: str,
     run_name: str,
     pipeline_version: str,
-    pipeline_status: str
+    pipeline_status: str,
+    execution_type: str = 'full'
 ) -> str:
 
     client = MlflowClient()
@@ -26,6 +27,17 @@ def get_latest_pipeline_run_id(
         raise RuntimeError(
             f"Experiment '{experiment_name}' not found"
         )
+    
+    full_runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=(f"and tags.pipeline_status = '{pipeline_status}'"
+                       f"and tags.execution_type = '{execution_type}'")
+    )
+
+    if not full_runs:
+        raise RuntimeError(
+            "No full pipeline execution found. Run the pipeline from INGEST first."
+        ) 
 
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
@@ -33,6 +45,7 @@ def get_latest_pipeline_run_id(
             f"tags.mlflow.runName = '{run_name}' "
             f"and tags.dataset_hash = '{pipeline_version}'"
             f"and tags.pipeline_status = '{pipeline_status}'"
+            f"and tags.execution_type = '{execution_type}'"
 
         ),
         order_by=["attributes.start_time DESC"],
@@ -41,7 +54,7 @@ def get_latest_pipeline_run_id(
 
     if not runs:
         raise RuntimeError(
-            f"No pipeline_execution run found for git_commit='{pipeline_version}'"
+            f"No pipeline_execution run found for dataset_hash='{pipeline_version}'"
         )
    
     return runs[0].info.run_id
