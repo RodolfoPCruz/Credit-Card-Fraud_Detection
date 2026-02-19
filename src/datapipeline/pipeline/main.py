@@ -2,8 +2,6 @@ import argparse
 import yaml
 import mlflow
 import logging
-import seaborn as sns
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from enum import Enum
@@ -119,6 +117,11 @@ class PipelineRunner():
         
         start_index = self.stage_order.index(start_stage)
         return self.stage_order[start_index:]
+    
+    def _execute_pipeline(self, stages_to_run):
+        for stage in stages_to_run:
+            self.logger.info(f'Running stage: {stage}')
+            self.stage_map[stage]()
 
 
     def run(self):
@@ -163,19 +166,15 @@ class PipelineRunner():
 
             self._set_global_tags()
           
-            for stage in stages_to_run:
-                self.logger.info(f'Running stage: {stage}')
-                self.stage_map[stage]()
-
             try:
-            # complete pipeline
+                self._execute_pipeline(stages_to_run)
                 mlflow.set_tag("pipeline_status", "completed")
                 mlflow.set_tag("initial_stage", self.stage)
-            except Exception:
-                mlflow.set_tag("pipeline_status", "failed") 
-                raise
 
-        
+            except Exception:
+                mlflow.set_tag("pipeline_status", "failed")
+                raise
+    
 
     def _set_global_tags(self):
         mlflow.set_tag("version", self.config['pipeline']['version'])
