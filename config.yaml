@@ -1,15 +1,16 @@
 pipeline:
-  log_path: logs/pipeline_logs.log'
+  log_path: pipeline_logs.log'
   experiment_name: 'Credit-Card-Fraud-Detection'
   run_name: 'pipeline'
   version: '1.0.0'
   pipeline_status: 'completed'
 
-data_ingestion:
+ingest:
   run_name: 'data_ingestion'
   schema_path : 'src/datapipeline/config/data_schema.yaml'
-  raw_dataset_path: 'data/raw/creditcard.csv'
+  input_path: 'data/raw/creditcard.csv'
   raw_dataset_path_parquet: 'data/raw/creditcard.parquet'
+  raw_dataset_artifact_name: 'raw_dataset'
   raw_dataset_path_mlflow: 'raw_data'
 
 data_cleaning:

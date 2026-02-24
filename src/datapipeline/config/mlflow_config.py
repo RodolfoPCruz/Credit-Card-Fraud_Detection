@@ -1,11 +1,11 @@
 import mlflow
 import os
-import loggimg
+import logging
 
 
 
 def setup_mlflow(experiment_name: str,
-                logger: loggimg.Logger | None = None) -> None:
+                logger: logging.Logger | None = None) -> None:
     """
     Configure MLflow tracking URI and experiment.
 

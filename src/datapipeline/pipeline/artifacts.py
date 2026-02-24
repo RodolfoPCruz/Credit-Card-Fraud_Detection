@@ -3,6 +3,9 @@ import mlflow
 import pandas as pd 
 import logging
 import subprocess
+from tempfile import TemporaryDirectory
+from pathlib import Path
+import os
 
 def get_git_commit():
     try:
@@ -81,3 +84,14 @@ def load_df_from_mlflow(experiment_name: str,
     )
     return pd.read_parquet(path)
 
+def log_dataframe_artifact(df, 
+                           artifact_name: str,
+                           artifact_path_mlflow: str):
+    with TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / f"{artifact_name}.parquet"
+        df.to_parquet(tmp_path)
+        mlflow.log_artifact(tmp_path, artifact_path=artifact_path_mlflow)
+
+
+def get_log_dir() -> Path:
+    return Path(os.getenv("LOG_DIR", "./logs")).resolve()
