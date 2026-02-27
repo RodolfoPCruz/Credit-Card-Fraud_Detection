@@ -16,9 +16,9 @@ def train_model(train_df: pd.DataFrame,
                 hyperparameters: dict,
                 threshold: float,
                 registered_model_name: str,
-                artifacts_dir: str,
-                artifacts_path_mlflow: str,
-                threshold_file_name: str,
+                #artifacts_dir: str,
+                #artifacts_path_mlflow: str,
+                #threshold_file_name: str,
                 logger: logging.Logger | None = None
                 ) -> dict:
     """
@@ -71,12 +71,12 @@ def train_model(train_df: pd.DataFrame,
                               registered_model_name=registered_model_name,
                               input_example=x_train.iloc[:5])
 
-    file_name = threshold_file_name
-    artifacts_dir = Path(artifacts_dir)
-    with open(artifacts_dir / file_name, 'w') as f:
-        json.dump(threshold_dict, f)
-    mlflow.log_artifact(artifacts_dir / file_name, 
-                        artifact_path=artifacts_path_mlflow)
+    #file_name = threshold_file_name
+    #artifacts_dir = Path(artifacts_dir)
+    #with open(artifacts_dir / file_name, 'w') as f:
+    #    json.dump(threshold_dict, f)
+    #mlflow.log_artifact(artifacts_dir / file_name, 
+    #                    artifact_path=artifacts_path_mlflow)
 
 
     precision, recall, thresholds = precision_recall_curve(

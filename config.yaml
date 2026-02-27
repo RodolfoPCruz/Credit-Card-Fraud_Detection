@@ -8,31 +8,38 @@ pipeline:
 ingest:
   run_name: 'data_ingestion'
   schema_path : 'src/datapipeline/config/data_schema.yaml'
-  input_path: 'data/raw/creditcard.csv'
+  input_paths: 
+    - 'data/raw/creditcard.csv'
   raw_dataset_path_parquet: 'data/raw/creditcard.parquet'
   raw_dataset_artifact_name: 'raw_dataset'
   raw_dataset_path_mlflow: 'raw_data'
 
-data_cleaning:
+clean:
   run_name: 'data_cleaning'
+  input_paths: 
+    - 'data/raw/creditcard.parquet'
   cleaned_dataset_path: 'data/cleaned/creditcard_cleaned.parquet'
   target_column: 'Class'
   min_samples: 1000
   num_classes: 2
   cleaned_dataset_path_mlflow: cleaned_dataset
 
-data_split:
+split:
   run_name: 'data_split'
   test_size: 0.3
   random_state: 42
+  input_paths: 
+    - 'data/cleaned/creditcard_cleaned.parquet'
   train_path: 'data/splits/train.parquet'
   test_path: 'data/splits/test.parquet'
   tolerance: 0.01
   train_artifact_path_mlflow: 'train' 
   test_artifact_path_mlflow: 'test'
   
-diagnostics:
+correlation:
   run_name: 'correlation diagnostics'
+  input_paths: 
+    - 'data/splits/train.parquet'
   correlation_matrix: 'artifacts/eda/correlation/correlation_matrix.parquet'
   correlation_metadata: 'artifacts/eda/correlation/correlation_matedata.parquet'
   correlation_heatmap: 'artifacts/eda/correlation/correlation_heatmap.png'
@@ -44,8 +51,11 @@ feature_engineering:
   threshold_correlation: 0.95
   correlated_features_path : 'artifacts/feature_engineering/correlation/correlated_features.parquet'
   correlated_features_path_mlflow : 'correlated_features'
-  train_path_feature_engineered: 'data/splits//feature_engineered/train_fe.parquet'
-  test_path_feature_engineered: 'data/splits//feature_engineered/test_fe.parquet'
+  train_path_feature_engineered: 'data/splits/feature_engineered/train_fe.parquet'
+  test_path_feature_engineered: 'data/splits/feature_engineered/test_fe.parquet'
+  input_paths:
+    - 'data/splits/train.parquet'
+    - 'data/splits/test.parquet'
   train_path_feature_engineered_mlflow: 'train_feature_engineered'
   test_path_feature_engineered_mlflow: 'test_feature_engineered'
 
@@ -69,12 +79,16 @@ model_training:
   iterations: 789
   learning_rate: 0.02
   threshold: 0.28
+  input_paths:
+    - 'data/splits/feature_engineered/train_fe.parquet'
+    - 'data/splits/feature_engineered/test_fe.parquet'
   classification_threshold_file_name: "classification_threshold.json"
   artifacts_path_mlflow_model_training: "model_config"
   registered_model_name: "fraud_catboost"
   artifacts_path_model_training: 'artifacts/model_training'
 
-inference: 
+evaluation: 
   run_name: 'inference'
+  input_paths: 'data/splits/feature_engineered/test_fe.parquet'
   artifacts_path_inference: 'artifacts/inference/predictions.parquet'
   artifacts_path_inference_mlflow: 'inference'
