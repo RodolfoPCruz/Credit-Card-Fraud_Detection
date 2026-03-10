@@ -7,18 +7,28 @@ from sklearn.metrics import (precision_recall_curve,
                             recall_score)
 import mlflow
 from mlflow.models import infer_signature
-import json
 from pathlib import Path
+import mlflow.pyfunc
+import os
+import tempfile
+import joblib
 
+
+class ModelWithThreshold(mlflow.pyfunc.PythonModel):
+
+    def load_context(self, context):
+        self.model = joblib.load(context.artifacts["model_path"])
+        self.threshold = joblib.load(context.artifacts["threshold_path"])
+
+    def predict(self, context, model_input):
+        probs = self.model.predict_proba(model_input)[:, 1]
+        return (probs >= float(self.threshold)).astype(int)
+        
 def train_model(train_df: pd.DataFrame,
                 test_df: pd.DataFrame,
                 target_column: str,
                 hyperparameters: dict,
                 threshold: float,
-                registered_model_name: str,
-                #artifacts_dir: str,
-                #artifacts_path_mlflow: str,
-                #threshold_file_name: str,
                 logger: logging.Logger | None = None
                 ) -> dict:
     """
@@ -40,6 +50,8 @@ def train_model(train_df: pd.DataFrame,
 
 
     mlflow.log_params(hyperparameters)
+    mlflow.set_tag("classification_threshold", threshold)
+
 
     if logger:
         logger.info('Training model...')
@@ -57,26 +69,31 @@ def train_model(train_df: pd.DataFrame,
     if logger:
         logger.info('Model trained')
 
-    threshold_value = threshold
-    threshold_dict = {"threshold": threshold_value}
+    
     y_pred_proba = catboost.predict_proba(x_test)[:,1]
-    y_pred = y_pred_proba > threshold_value
+    y_pred = y_pred_proba > threshold
 
     signature = infer_signature(x_train, y_pred_proba)
 
-    mlflow.set_tag("classification_threshold", threshold_value)
-    mlflow.catboost.log_model(catboost, 
-                              "model",
-                              signature=signature,
-                              registered_model_name=registered_model_name,
-                              input_example=x_train.iloc[:5])
+    mlflow.set_tag("classification_threshold", threshold)
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        model_path = os.path.join(tmp_dir, "catboost.pkl")
+        threshold_path = os.path.join(tmp_dir, "threshold.pkl")
 
-    #file_name = threshold_file_name
-    #artifacts_dir = Path(artifacts_dir)
-    #with open(artifacts_dir / file_name, 'w') as f:
-    #    json.dump(threshold_dict, f)
-    #mlflow.log_artifact(artifacts_dir / file_name, 
-    #                    artifact_path=artifacts_path_mlflow)
+        joblib.dump(catboost, model_path)
+        joblib.dump(threshold, threshold_path)
+
+        mlflow.pyfunc.log_model(
+        artifact_path="model",
+        python_model=ModelWithThreshold(),
+        artifacts={
+            "model_path": model_path,
+            "threshold": threshold_path
+        },
+        signature=signature,
+        input_example=x_train.iloc[:5]
+    )    
 
 
     precision, recall, thresholds = precision_recall_curve(

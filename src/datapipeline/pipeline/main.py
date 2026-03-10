@@ -129,6 +129,9 @@ class PipelineRunner():
             self.logger.info(f'Running stage: {stage}')
             if stage == Stage.INGEST:
                 self.stage_map[stage]()
+            #elif stage == Stage.CLEAN:
+            #    inputs = self._load_input(stage)
+            #    self.stage_map[stage](*inputs)
             else:
                 inputs = self._load_input(stage)
                 self.stage_map[stage](*inputs)
@@ -313,7 +316,6 @@ class PipelineRunner():
                 
         mlflow.log_artifact(path_corr_matrix, artifact_path=correlation_path_mlflow)
         mlflow.log_artifact(path_corr_metadata, artifact_path=correlation_path_mlflow)
-        #mlflow.log_artifact(path_corr_heatmap, artifact_path=correlation_path_mlflow)
 
     def _run_feature_engineering(self, X_train: pd.DataFrame, X_test: pd.DataFrame):
         with mlflow.start_run(run_name=self.config[Stage.FEATURE_ENGINEERING]['run_name'], 
@@ -360,7 +362,6 @@ class PipelineRunner():
         with mlflow.start_run(run_name=self.config[Stage.MODEL_TRAINING]['run_name'], 
                                   nested=True):
             target_column = self.config[Stage.CLEAN]['target_column'] 
-            #classification_threshold_file_name = self.config[Stage.MODEL_TRAINING]['classification_threshold_file_name']
             model_name = self.config[Stage.MODEL_TRAINING]['model_name']
 
             hyperparameters = {}
@@ -373,7 +374,6 @@ class PipelineRunner():
             classification_threshold = float(self.config[Stage.MODEL_TRAINING]['threshold'])
             artifact_path_model_training = self.project_root / self.config[Stage.MODEL_TRAINING]['artifacts_path_model_training']
             registered_model_name = self.config[Stage.MODEL_TRAINING]['registered_model_name']
-            artifacts_path_mlflow_model_training = self.config[Stage.MODEL_TRAINING]['artifacts_path_mlflow_model_training']
 
             artifact_path_model_training.parent.mkdir(parents=True, exist_ok=True)
 
@@ -384,9 +384,6 @@ class PipelineRunner():
                 hyperparameters = hyperparameters,
                 threshold = classification_threshold,
                 registered_model_name = registered_model_name,
-                #artifacts_dir=artifact_path_model_training,
-                #artifacts_path_mlflow = artifacts_path_mlflow_model_training,
-                #threshold_file_name = classification_threshold_file_name,
                 logger = self.logger)
 
             mlflow.log_param('classification_threshold', results['Threshold'])

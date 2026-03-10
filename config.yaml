@@ -87,7 +87,7 @@ model_training:
   registered_model_name: "fraud_catboost"
   artifacts_path_model_training: 'artifacts/model_training'
 
-evaluation: 
+inference: 
   run_name: 'inference'
   input_paths: 'data/splits/feature_engineered/test_fe.parquet'
   artifacts_path_inference: 'artifacts/inference/predictions.parquet'
