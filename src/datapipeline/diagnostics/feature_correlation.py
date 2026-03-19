@@ -42,8 +42,8 @@ class FeatureCorrelation:
     Parameters:
         df (pd.DataFrame): Input dataframe containing features only.
         alpha (float): Significance level used for normality tests.
-        max_discrete_unique (int): Maximum number of unique values for a
-            numeric feature to be considered discrete.
+        max_discrete_unique (int): Numeric feature with a number of unique 
+            values below max_discrete_unique are considered discrete.
         ordinal_map (dict, optional): Mapping for ordinal categorical 
         variables.
     """

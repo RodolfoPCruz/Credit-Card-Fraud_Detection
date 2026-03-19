@@ -1,3 +1,54 @@
+#Configuration for the notebooks
+  
+datasets:
+  raw_dataset_path: '../data/raw/creditcard.csv'
+  cleaned_dataset_path: '../data/cleaned/creditcard_cleaned.parquet'
+  train_dataset_path : '../data/splits/train.parquet'
+  test_dataset_path : '../data/splits/test.parquet'
+  train_feature_engineered_path : '../data/splits/feature_engineered/train_fe.parquet'
+  test_feature_engineered_path : '../data/splits/feature_engineered/test_fe.parquet'
+
+2-data_cleaning_and_split:
+  target_column: 'Class'
+  test_size : 0.3 # proportion of the dataset to include in the test split
+  splits_df_path : '../data/splits' # location to save the splitted dataset
+  min_samples : 1000 # minimun number of samples the dataset must contain
+  num_classes : 2 # minimum number of target classes the dataset must contain
+  train_df_file_name : 'train.parquet'
+  test_df_file_name : 'test.part'
+
+3-Feature-Engineering:
+  alpha : 0.05
+  max_discrete_unique : 10 # Maximum number of unique values for a numeric feature to be considered discrete.
+  threshold_correlation : 0.95
+  remove_correlated : True
+
+4-model_selection:
+  artifacts_path: 'model_selection'
+
+5-hyperparameter_tuning:
+  artifacts_path: 'comparison'
+
+##############################################################################
+  
+parameters:
+  random_state : 42
+  target_column: 'Class'
+
+mlflow:
+  experiment_path: '../mlruns'
+  experiment_name: 'Credit-Card-Fraud-Detection'
+
+
+
+##############################################################################
+
+
+
+
+
+
+
 pipeline:
   log_path: pipeline_logs.log'
   experiment_name: 'Credit-Card-Fraud-Detection'
@@ -59,16 +110,6 @@ feature_engineering:
   train_path_feature_engineered_mlflow: 'train_feature_engineered'
   test_path_feature_engineered_mlflow: 'test_feature_engineered'
 
-  
-  
-model_selection:
-  artifacts_path: 'artifacts//model_selection'
-
-model_tuning:
-  artifacts_path: 'artifacts/model_tuning'
-
-threshold_tuning:
-  artifacts_path: 'artifacts/threshold_tuning'
 
 model_training:
   run_name: 'Model_Training'
